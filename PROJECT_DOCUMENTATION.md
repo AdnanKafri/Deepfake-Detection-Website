@@ -1,507 +1,408 @@
-# دليل نظام كشف التزييف العميق (Deepfake Detection System)
+# Deepfake Detection Website - Technical Documentation
+# موقع لكشف التزييف العميق - التوثيق التقني
 
 ---
 
-## الفهرس
-1. مقدمة
-2. الهيكل العام للمشروع
-3. الأدوات والتقنيات والمكتبات المستخدمة
-4. صلاحيات المستخدمين والخصوصية
-5. شرح كل جزء وظيفياً
-6. تدفق البيانات من رفع الملف حتى التقرير
-7. شرح الذكاء الاصطناعي (تحليل الصور/الفيديو/الصوت)
-8. واجهات المستخدم (Blade) وتفصيل كل صفحة
-9. آلية التقييم والإبلاغ
-10. آلية توليد وتحميل تقارير PDF
-11. العلاقات بين الملفات والمكونات
-12. أمثلة عملية (سيناريوهات)
-13. ملحق: مخططات تدفق البيانات
-14. ملاحظات إضافية
-15. الحالات الخاصة والأخطاء (Special Cases & Errors)
-16. واجهة API (ملحق للمطورين)
+## Table of Contents - فهرس المحتويات
+
+1. [Introduction - مقدمة](#introduction)
+2. [System Architecture - هيكل النظام](#system-architecture)
+3. [Technologies & Libraries - التقنيات والمكتبات](#technologies--libraries)
+4. [User Permissions & Privacy - صلاحيات المستخدمين والخصوصية](#user-permissions--privacy)
+5. [Component Overview - نظرة عامة على المكونات](#component-overview)
+6. [Data Flow - تدفق البيانات](#data-flow)
+7. [AI/ML Implementation - تنفيذ الذكاء الاصطناعي](#aiml-implementation)
+8. [User Interface - واجهة المستخدم](#user-interface)
+9. [Evaluation & Reporting System - نظام التقييم والإبلاغ](#evaluation--reporting-system)
+10. [PDF Report Generation - توليد تقارير PDF](#pdf-report-generation)
+11. [File Relationships - العلاقات بين الملفات](#file-relationships)
+12. [Use Cases - حالات الاستخدام](#use-cases)
+13. [Error Handling - معالجة الأخطاء](#error-handling)
+14. [API Reference - مرجع API](#api-reference)
 
 ---
 
-## تحديثات وتوضيحات هامة
+## Important Updates & Clarifications - تحديثات وتوضيحات هامة
 
-### 1. قواعد القرار لنموذج الصوت (Threshold Logic)
+### 1. Audio Model Decision Rules - قواعد القرار لنموذج الصوت
 
-- **قيمة العتبة (Confidence Threshold):**
-  - العتبة المستخدمة لتصنيف مقطع صوتي على أنه "مزيف بثقة عالية" هي **0.75** (أي إذا كانت احتمالية التزييف > 0.75 يعتبر المقطع مزيف بثقة عالية).
-- **عدد المقاطع:**
-  - إذا كان هناك **3 مقاطع أو أكثر** مصنفة كـ "مزيفة بثقة عالية"، يُعتبر الملف الصوتي بالكامل مزيفاً.
-- **هل هي ثابتة أم قابلة للتخصيص؟**
-  - هذه القيم **ثابتة في الكود الحالي** (hardcoded)، ويمكن تعديلها برمجياً إذا لزم الأمر.
-- **هل تم اختبارها تجريبياً؟**
-  - تم وضع هذه القاعدة بناءً على ملاحظات أولية وتجارب عملية أثناء تطوير النظام، لكنها ليست نتيجة دراسة إحصائية موسعة. يوصى بتحديثها مستقبلاً بناءً على بيانات حقيقية وتجارب أوسع.
+- **Confidence Threshold - عتبة الثقة:**
+  - Threshold for classifying audio segment as "high-confidence fake": **0.75**
+  - If fake probability > 0.75, segment is classified as fake with high confidence
+- **Segment Count Rule - قاعدة عدد المقاطع:**
+  - If **3 or more segments** are classified as "high-confidence fake", the entire audio file is considered fake
+- **Configurability - قابلية التخصيص:**
+  - These values are **hardcoded** in the current implementation
+  - Can be modified programmatically if needed
+- **Validation - التحقق:**
+  - Rules are based on initial observations and practical experiments
+  - Recommended to update based on real data and broader testing
 
-### 2. سياسة الخصوصية وحذف التحليلات
+### 2. Privacy Policy & Analysis Deletion - سياسة الخصوصية وحذف التحليلات
 
-- **مدة حفظ التحليلات:**
-  - التحليلات تحفظ في قاعدة البيانات **حتى يقوم المستخدم بحذفها يدوياً**.
-  - لا يتم حذف التحليل تلقائياً بعد توليد التقرير أو بعد فترة زمنية.
-- **حذف التحليل:**
-  - يمكن للمستخدم حذف أي تحليل خاص به من لوحة التحكم.
-  - عند حذف التحليل، يتم حذف جميع التفاصيل المرتبطة به (AnalysisDetail) من قاعدة البيانات.
-- **حذف الملفات المرتبطة:**
-  - عند حذف التحليل، يتم أيضاً حذف الملفات المرتبطة (صور الفريمات، الوجوه، صور MFCC) من التخزين (storage/app/public/analysis_frames) لضمان حماية الخصوصية وعدم بقاء بيانات حساسة.
-- **سياسة الخصوصية:**
-  - جميع التحليلات خاصة بالمستخدم ولا يمكن لأي طرف آخر الوصول إليها إلا في حال التقييم أو الإبلاغ.
-  - يمكن للمستخدم حذف بياناته في أي وقت.
-  - لا يتم الاحتفاظ بأي ملفات أو بيانات بعد الحذف.
+- **Analysis Retention - مدة حفظ التحليلات:**
+  - Analyses are stored in database **until manually deleted by user**
+  - No automatic deletion after report generation or time period
+- **Analysis Deletion - حذف التحليل:**
+  - Users can delete any analysis from their dashboard
+  - All related details (AnalysisDetail) are removed from database
+- **File Cleanup - تنظيف الملفات:**
+  - Associated files (frame images, faces, MFCC images) are deleted from storage
+  - Ensures privacy protection and no sensitive data retention
+- **Privacy Policy - سياسة الخصوصية:**
+  - All analyses are private to the user
+  - No access by administrators except for evaluated/reported content
+  - Users can delete their data at any time
+  - No data retention after deletion
 
-### 3. نظام الانتظار/الصف (Queue/Job System) والتوسعة
+### 3. Queue System & Scalability - نظام الصف والتوسعة
 
-- **آلية إرسال الملفات:**
-  - حالياً، الملفات تُرسل **مباشرة** من Laravel إلى FastAPI عبر HTTP عند رفعها (synchronous call).
-- **هل يوجد Queue؟**
-  - لا يوجد نظام صف (Queue) أو Job System في النسخة الحالية. كل طلب تحليل يُنفذ فوراً.
-- **ماذا يحصل عند رفع ملفات ضخمة أو طلبات كثيرة؟**
-  - إذا تم رفع عدة ملفات أو ملفات ضخمة في نفس الوقت، قد يواجه النظام بطء أو تأخير في الاستجابة، خاصة إذا كانت موارد الخادم محدودة.
-- **التوصيات المستقبلية (Scalability):**
-  - يوصى مستقبلاً بإضافة نظام Queue (مثل Laravel Queue/Jobs) بحيث يتم وضع كل طلب تحليل في صف، ويعالجه عامل (Worker) منفصل، مما يسمح بتوزيع الأحمال وعدم استهلاك موارد الخادم دفعة واحدة.
-  - يمكن أيضاً توزيع التحليلات على عدة خوادم FastAPI أو استخدام حاويات (Containers) لزيادة التوسعة.
-  - يمكن مراقبة حالة التحليل (قيد الانتظار/قيد التنفيذ/مكتمل) وإبلاغ المستخدم عند انتهاء التحليل.
-
----
-
-## تحديث في سياسة الخصوصية (ضمن قسم الخصوصية)
-- التحليلات تحفظ حتى حذفها من قبل المستخدم.
-- عند حذف التحليل، يتم حذف جميع الملفات المرتبطة نهائياً.
-- لا يتم الاحتفاظ بأي بيانات بعد الحذف.
-
----
-
-## تحديث في قسم الذكاء الاصطناعي (الصوت)
-- قاعدة القرار: إذا كان هناك 3 مقاطع أو أكثر مزيفة بثقة > 0.75 يعتبر الملف مزيفاً.
-- القيم ثابتة ويمكن تعديلها برمجياً.
-- القاعدة وضعت بناءً على تجارب أولية ويُنصح بتحديثها مستقبلاً بناءً على بيانات حقيقية.
+- **Current Implementation - التنفيذ الحالي:**
+  - Files are sent **directly** from Laravel to FastAPI via HTTP (synchronous)
+  - No queue system or job processing in current version
+- **Concurrent Requests - الطلبات المتزامنة:**
+  - Multiple large files or concurrent requests may cause performance issues
+  - Server resources may be limited with heavy load
+- **Future Recommendations - التوصيات المستقبلية:**
+  - Implement Laravel Queue/Jobs system for analysis requests
+  - Use separate workers to process analyses
+  - Distribute load across multiple FastAPI servers
+  - Use containers for better scalability
+  - Monitor analysis status and notify users upon completion
 
 ---
 
-## تحديث في قسم البنية والتوسعة
-- حالياً لا يوجد Queue، التحليل يتم مباشرة.
-- يوصى مستقبلاً بإضافة Queue/Job System لتحمل الأحمال الكبيرة.
+## 1. Introduction - مقدمة
+
+The Deepfake Detection Website is a comprehensive web application that enables users to upload media files (images, videos, audio) for analysis and detection of deepfake content using advanced artificial intelligence techniques. The system provides a user-friendly interface, detailed reports, evaluation mechanisms, and advanced admin management while maintaining strict user privacy.
+
+موقع كشف التزييف العميق هو تطبيق ويب شامل يتيح للمستخدمين رفع ملفات الوسائط (الصور والفيديوهات والصوت) لتحليلها وكشف المحتوى المزيف باستخدام تقنيات الذكاء الاصطناعي المتقدمة. يوفر النظام واجهة سهلة الاستخدام وتقارير مفصلة وآليات تقييم وإدارة متقدمة للأدمن مع الحفاظ على خصوصية المستخدمين بشكل صارم.
 
 ---
 
-## 1. مقدمة
-
-نظام كشف التزييف العميق هو منصة متكاملة تتيح للمستخدمين رفع ملفات (صور، فيديو، صوت) لتحليلها وكشف ما إذا كانت مزيفة (Deepfake) باستخدام تقنيات الذكاء الاصطناعي. النظام يوفر لوحة تحكم للمستخدم، تقارير مفصلة، تقييمات وبلاغات، وإدارة متقدمة للأدمن، مع مراعاة خصوصية المستخدمين بشكل صارم.
-
----
-
-## 2. الهيكل العام للمشروع
+## 2. System Architecture - هيكل النظام
 
 ```
-Graduation Project/
-├── laravel-app/         # تطبيق Laravel (الويب)
+Deepfake Detection Website/
+├── laravel-app/              # Laravel Frontend Application
 │   ├── app/
-│   │   ├── Http/Controllers/   # الكنترولاتر (منطق الطلبات)
-│   │   ├── Services/           # الخدمات (DeepfakeDetectionService)
-│   │   ├── Models/             # نماذج البيانات (Analysis, ...)
-│   │   └── ...
-│   ├── resources/views/        # واجهات المستخدم (Blade)
-│   ├── routes/                 # تعريف المسارات (web, api, auth)
-│   └── ...
-├── python-api/          # تطبيق FastAPI (الذكاء الاصطناعي)
-│   ├── core/            # منطق التحليل (media_analyzer.py, ...)
-│   ├── models/          # النماذج المدربة (EfficientNet, BiLSTM)
-│   └── ...
-└── storage/app/public/analysis_frames/  # مجلد مشترك لحفظ صور الفريمات والوجوه
+│   │   ├── Http/Controllers/ # Request handling logic
+│   │   ├── Services/         # Business logic services
+│   │   ├── Models/           # Database models
+│   │   └── Policies/         # Authorization policies
+│   ├── resources/views/      # User interface templates
+│   ├── routes/               # Application routing
+│   └── public/               # Public assets
+├── python-api/               # FastAPI Backend
+│   ├── core/                 # Core analysis modules
+│   │   ├── analyzer.py       # Main analysis engine
+│   │   └── audio_analyzer.py # Audio processing
+│   ├── models/               # AI model files
+│   ├── uploads/              # Temporary file storage
+│   └── main.py              # FastAPI application
+└── storage/app/public/analysis_frames/  # Shared storage for analysis images
 ```
 
 ---
 
-## 3. الأدوات والتقنيات والمكتبات المستخدمة
+## 3. Technologies & Libraries - التقنيات والمكتبات
 
 ### **Backend (Laravel):**
 - Laravel 9+
 - PHP 8+
 - Eloquent ORM
-- DomPDF (توليد PDF)
-- Sanctum (توثيق API)
-- Tailwind CSS (تصميم متجاوب)
-- SweetAlert (نوافذ منبثقة)
+- DomPDF (PDF generation)
+- Laravel Sanctum (API authentication)
+- Tailwind CSS (responsive design)
+- SweetAlert (modal dialogs)
 
 ### **Frontend:**
 - Blade Templates (Laravel)
 - Tailwind CSS
-- JavaScript (بعض التفاعلات)
+- JavaScript (interactive features)
 - SweetAlert
 
 ### **AI/ML (Python - FastAPI):**
-- FastAPI (REST API)
+- FastAPI (REST API framework)
 - PyTorch (EfficientNet-B4)
-- facenet-pytorch (MTCNN)
-- OpenCV (معالجة الفيديو)
-- Pillow (معالجة الصور)
-- TensorFlow/Keras (BiLSTM للصوت)
-- librosa (معالجة الصوت واستخراج الميزات)
-- numpy, matplotlib (تحليل وعرض الميزات)
-- streamlit (واجهة اختبار النماذج)
+- facenet-pytorch (MTCNN face detection)
+- OpenCV (video processing)
+- Pillow (image processing)
+- TensorFlow/Keras (BiLSTM for audio)
+- librosa (audio processing and feature extraction)
+- numpy, matplotlib (analysis and visualization)
+- streamlit (model testing interface)
 
-### **أخرى:**
-- تخزين مشترك للصور والفريمات بين Laravel وFastAPI (storage/app/public/analysis_frames)
-- حماية خصوصية المستخدمين (لا يرى الأدمن إلا التقارير المبلغ عنها أو المقيمة)
-
----
-
-## 4. صلاحيات المستخدمين والخصوصية
-
-### **المستخدم المسجل:**
-- يمكنه رفع وتحليل الملفات (صور/فيديو/صوت).
-- يمكنه مراجعة جميع تحليلاته وتقاريره السابقة من لوحة التحكم.
-- يمكنه تحميل تقرير PDF لأي تحليل خاص به.
-- يمكنه تقييم نتيجة التحليل (صحيحة/خاطئة).
-- يمكنه الإبلاغ عن تقرير إذا كان خطيراً أو حساساً.
-
-### **الزائر (غير المسجل):**
-- يمكنه رفع ملف وتحليل واحد فقط في كل مرة.
-- لا يمكنه حفظ أو مراجعة التحليلات السابقة أو تحميل PDF.
-
-### **الأدمن:**
-- لا يمكنه الوصول إلا للتقارير التي تم تقييمها أو الإبلاغ عنها من قبل المستخدمين.
-- عند التقييم أو الإبلاغ، يصبح التقرير متاحاً للأدمن مع كامل التفاصيل (بما فيها الصور والفريمات والمقاطع الصوتية).
-- يمكنه تحويل التقارير المبلغ عنها لجهة مختصة.
-
-### **الخصوصية:**
-- جميع التحليلات والتقارير خاصة بالمستخدم ولا يمكن لأي مسؤول أو أدمن الوصول إليها إلا في حال التقييم أو الإبلاغ.
-- عند التقييم أو الإبلاغ، يوافق المستخدم على إتاحة كامل تفاصيل التقرير لمسؤولي الموقع.
+### **Infrastructure:**
+- Shared storage between Laravel and FastAPI
+- User privacy protection
+- Comprehensive error handling
 
 ---
 
-## 5. شرح كل جزء وظيفياً
+## 4. User Permissions & Privacy - صلاحيات المستخدمين والخصوصية
 
-### أ. الكنترولاتر (Controllers)
-- **DeepfakeController:** استقبال الملفات، تحديد النوع، إرسالها للذكاء الاصطناعي، حفظ النتائج.
-- **DashboardController:** عرض لوحة المستخدم، تفاصيل التحليلات، استقبال التقييمات والبلاغات.
-- **ReportController:** توليد وتحميل تقارير PDF، عرض صور التحليل.
-- **AdminController:** إدارة المستخدمين، التحليلات، الصلاحيات.
-- **ProfileController:** إدارة الحساب الشخصي.
+### **Registered User - المستخدم المسجل:**
+- Upload and analyze media files (images/video/audio)
+- Review all analyses and reports from dashboard
+- Download PDF reports for any analysis
+- Evaluate analysis results (correct/incorrect)
+- Report concerning or sensitive content
 
-### ب. الخدمات (Services)
-- **DeepfakeDetectionService:** وسيط بين Laravel وFastAPI، يرسل الملفات عبر HTTP ويعيد النتائج.
+### **Guest User - المستخدم الزائر:**
+- Upload and analyze one file at a time
+- Cannot save or review previous analyses
+- Cannot download PDF reports
 
-### ج. النماذج (Models)
-- **Analysis:** يمثل عملية تحليل واحدة (ملف واحد).
-- **AnalysisDetail:** تفاصيل لكل جزء من الملف (فريم/وجه/مقطع).
-- **User:** بيانات المستخدمين وصلاحياتهم.
+### **Administrator - المدير:**
+- Access only to evaluated or reported content
+- Full access to reported content details (including images, frames, audio segments)
+- Transfer reported content to relevant authorities
+- User and system management
 
-### د. الواجهات (Views/Blade)
-- **deepfake/index:** صفحة رفع وتحليل الملفات.
-- **dashboard/show:** صفحة عرض تقرير التحليل المفصل.
-- **components/analysis:** مكونات جزئية (معلومات عامة، تفاصيل تقنية، تحليل مفصل، إجراءات، نوافذ منبثقة).
-- **admin/**: صفحات إدارة الأدمن.
-- **reports/analysis:** قالب تقرير PDF.
-- **auth/**: صفحات تسجيل الدخول والتوثيق.
-
-### هـ. FastAPI (Python)
-- **media_analyzer.py:** تحليل الصور والفيديو (اكتشاف الوجوه، تصنيفها، حفظ الصور).
-- **audio_analyzer.py:** تحليل الصوت (تقطيع، استخراج ميزات MFCC، تصنيف، تحليل jitter/shimmer).
-- **deepfake_app.py:** واجهة تفاعلية لاختبار النماذج.
+### **Privacy - الخصوصية:**
+- All analyses and reports are private to the user
+- No administrator access except for evaluated/reported content
+- User consent required for evaluation or reporting
+- Complete data deletion upon user request
 
 ---
 
-## 6. تدفق البيانات من رفع الملف حتى التقرير
+## 5. Component Overview - نظرة عامة على المكونات
 
-1. **رفع الملف:** المستخدم يرفع ملفاً عبر الواجهة.
-2. **تحقق وتوجيه:** DeepfakeController يتحقق من النوع ويرسل الملف إلى DeepfakeDetectionService.
-3. **إرسال إلى FastAPI:** الخدمة ترسل الملف إلى FastAPI عبر HTTP POST.
-4. **تحليل الذكاء الاصطناعي:**
-   - صورة: اكتشاف وجوه وتصنيفها.
-   - فيديو: اختيار فريمات وتحليلها كصور.
-   - صوت: تقطيع وتحليل كل مقطع.
-5. **استلام النتيجة:** FastAPI يعيد JSON فيه النتيجة والتفاصيل.
-6. **حفظ وعرض:** Laravel يحفظ النتيجة في قاعدة البيانات ويعرضها للمستخدم.
-7. **توليد تقرير PDF:** عند الطلب، يولد تقرير PDF مفصل بالصور والنتائج.
+### **Controllers - المتحكمات:**
+- **AnalysisController:** File upload, type detection, AI service communication, result storage
+- **DashboardController:** User dashboard, analysis details, evaluation and reporting
+- **ReportController:** PDF generation and download, analysis image display
+- **AdminController:** User management, analysis oversight, permissions
+- **ProfileController:** Account management
 
----
+### **Services - الخدمات:**
+- **DeepfakeDetectionService:** Mediator between Laravel and FastAPI, HTTP communication
 
-## 7. شرح الذكاء الاصطناعي (تحليل الصور/الفيديو/الصوت)
+### **Models - النماذج:**
+- **Analysis:** Represents a single analysis operation (one file)
+- **AnalysisDetail:** Details for each file component (frame/face/segment)
+- **User:** User data and permissions
 
-### **معالجة الصور (Image Processing):**
-1. استقبال الصورة من Laravel إلى FastAPI.
-2. فتح الصورة وتحويلها إلى RGB.
-3. اكتشاف جميع الوجوه باستخدام MTCNN (facenet-pytorch).
-4. قص كل وجه وتغيير حجمه إلى 224x224.
-5. تحويل الوجه إلى Tensor وتطبيعه (Normalization) حسب معايير EfficientNet.
-6. تصنيف الوجه باستخدام EfficientNet-B4 (PyTorch) (REAL/FAKE) مع حساب الثقة.
-7. حساب النتيجة النهائية حسب الأغلبية والثقة.
-8. حفظ الصور الأصلية والمقصوصة في مجلد مشترك مع Laravel.
-9. إرجاع JSON فيه تفاصيل كل وجه، المسارات، النتيجة النهائية، الثقة، عدد الوجوه.
+### **Views - الواجهات:**
+- **analysis/index:** File upload and analysis page
+- **dashboard/show:** Detailed analysis report display
+- **components/analysis:** Reusable components (general info, technical details, detailed analysis, actions, modals)
+- **admin/:** Administrator management pages
+- **reports/analysis:** PDF report template
+- **auth/:** Authentication pages
 
-### **معالجة الفيديو (Video Processing):**
-1. استقبال الفيديو من Laravel إلى FastAPI.
-2. قراءة الفيديو باستخدام OpenCV.
-3. اختيار عدد محدد من الفريمات موزعة على طول الفيديو (مثلاً 10 فريمات).
-4. لكل فريم: تحويله لصورة وتطبيق نفس خطوات معالجة الصورة.
-5. حفظ صور الفريمات والوجوه.
-6. حساب النتيجة النهائية حسب تصويت الفريمات والثقة.
-7. إرجاع JSON فيه تفاصيل كل فريم، الوجوه، المسارات، النتيجة النهائية، الثقة.
-
-### **معالجة الصوت (Audio Processing):**
-1. استقبال الملف الصوتي من Laravel إلى FastAPI.
-2. تحميل الصوت باستخدام librosa وتحويله إلى تردد ثابت (16kHz).
-3. تقطيع الصوت إلى مقاطع قصيرة (2.5 ثانية) باستخدام VAD.
-4. لكل مقطع: استخراج ميزات MFCC وDelta وDelta-Delta، وميزات متقدمة (jitter, shimmer, pitch variance).
-5. تصنيف المقطع باستخدام BiLSTM (TensorFlow/Keras).
-6. حساب النتيجة النهائية حسب عدد المقاطع المزيفة والثقة وقواعد إضافية (مثلاً إذا كان هناك أكثر من 3 مقاطع مزيفة بثقة عالية يعتبر مزيف).
-7. إرجاع JSON فيه تفاصيل كل مقطع، الميزات، النتيجة النهائية، الثقة، صور MFCC (base64).
+### **FastAPI (Python):**
+- **analyzer.py:** Image and video analysis (face detection, classification, image saving)
+- **audio_analyzer.py:** Audio analysis (segmentation, MFCC feature extraction, classification, jitter/shimmer analysis)
+- **main.py:** FastAPI application and endpoints
 
 ---
 
-## 8. واجهات المستخدم (Blade) وتفصيل كل صفحة
+## 6. Data Flow - تدفق البيانات
 
-### **deepfake/index.blade.php**
-- صفحة رفع وتحليل الملفات.
-- تعرض نموذج رفع، اختيار نوع الملف، زر تحليل.
-- تعرض النتيجة مباشرة إذا لم يكن المستخدم مسجلاً.
+1. **File Upload:** User uploads file through web interface
+2. **Validation & Routing:** AnalysisController validates file type and routes to DeepfakeDetectionService
+3. **API Communication:** Service sends file to FastAPI via HTTP POST
+4. **AI Analysis:**
+   - Image: Face detection and classification
+   - Video: Frame selection and analysis
+   - Audio: Segmentation and analysis
+5. **Result Processing:** FastAPI returns JSON with results and details
+6. **Storage & Display:** Laravel stores results in database and displays to user
+7. **PDF Generation:** Detailed PDF report generation upon request
+
+---
+
+## 7. AI/ML Implementation - تنفيذ الذكاء الاصطناعي
+
+### **Image Processing - معالجة الصور:**
+1. Receive image from Laravel to FastAPI
+2. Open image and convert to RGB format
+3. Detect all faces using MTCNN (facenet-pytorch)
+4. Crop each face and resize to 224x224
+5. Convert face to Tensor and normalize according to EfficientNet standards
+6. Classify face using EfficientNet-B4 (PyTorch) (REAL/FAKE) with confidence calculation
+7. Calculate final result based on majority and confidence
+8. Save original and cropped images in shared folder with Laravel
+9. Return JSON with details for each face, paths, final result, confidence, face count
+
+### **Video Processing - معالجة الفيديو:**
+1. Receive video from Laravel to FastAPI
+2. Read video using OpenCV
+3. Select specific number of frames distributed across video length (e.g., 10 frames)
+4. For each frame: convert to image and apply same image processing steps
+5. Save frame images and faces
+6. Calculate final result based on frame voting and confidence
+7. Return JSON with details for each frame, faces, paths, final result, confidence
+
+### **Audio Processing - معالجة الصوت:**
+1. Receive audio file from Laravel to FastAPI
+2. Load audio using librosa and convert to fixed frequency (16kHz)
+3. Segment audio into short segments (2.5 seconds) using VAD
+4. For each segment: extract MFCC, Delta, and Delta-Delta features, plus advanced features (jitter, shimmer, pitch variance)
+5. Classify segment using BiLSTM (TensorFlow/Keras)
+6. Calculate final result based on fake segment count, confidence, and additional rules (e.g., if 3+ segments are fake with high confidence, consider entire file fake)
+7. Return JSON with details for each segment, features, final result, confidence, MFCC images (base64)
+
+---
+
+## 8. User Interface - واجهة المستخدم
+
+### **analysis/index.blade.php**
+- File upload and analysis page
+- Displays upload form, file type selection, analysis button
+- Shows results immediately for guest users
 
 ### **dashboard/show.blade.php**
-- صفحة عرض تقرير التحليل المفصل.
-- مقسمة إلى:
-  - معلومات عامة (اسم الملف، النتيجة، الثقة، المستخدم، التاريخ).
-  - تفاصيل تقنية (النموذج، نوع التحليل، الميزات، إحصائيات).
-  - التحليل المفصل (جدول الفريمات/الوجوه/المقاطع مع الصور والنتائج).
-  - إجراءات (تحميل PDF، تقييم النتيجة، إبلاغ).
-  - نوافذ منبثقة (عرض الصور، تقييم، إبلاغ).
-- تستخدم مكونات جزئية:
-  - `general-info`, `technical-details`, `detailed-analysis`, `actions`, `modals`.
+- Detailed analysis report display page
+- Sections include:
+  - General information (filename, result, confidence, user, date)
+  - Technical details (model, analysis type, features, statistics)
+  - Detailed analysis (table of frames/faces/segments with images and results)
+  - Actions (download PDF, evaluate result, report)
+  - Modals (image display, evaluation, reporting)
+- Uses components: `general-info`, `technical-details`, `detailed-analysis`, `actions`, `modals`
 
 ### **admin/**
-- صفحات إدارة الأدمن (المستخدمين، التحليلات، التفاصيل).
-- الأدمن يرى فقط التقارير التي تم تقييمها أو الإبلاغ عنها.
-- يمكنه تحويل التقارير المبلغ عنها لجهة مختصة.
+- Administrator management pages (users, analyses, details)
+- Admin sees only evaluated or reported content
+- Can transfer reported content to relevant authorities
 
 ### **reports/analysis.blade.php**
-- قالب تقرير PDF مفصل.
-- يعرض كل التفاصيل والصور والنتائج.
+- Detailed PDF report template
+- Displays all details, images, and results
 
 ### **auth/**
-- صفحات تسجيل الدخول، التسجيل، استعادة كلمة المرور.
+- Login, registration, password recovery pages
 
 ---
 
-## 9. آلية التقييم والإبلاغ
+## 9. Evaluation & Reporting System - نظام التقييم والإبلاغ
 
-- **التقييم:** بعد ظهور نتيجة التحليل، يمكن للمستخدم تقييمها إذا كانت صحيحة أم لا. هذا يساعد في تحسين الذكاء الاصطناعي.
-- **الإبلاغ:** إذا كان التقرير يحتوي على محتوى خطير أو حساس، يمكن للمستخدم الإبلاغ عنه. يصل البلاغ للأدمن، ويمكن تحويله لجهة مختصة.
-- **تنويه الخصوصية:** عند التقييم أو الإبلاغ، يوافق المستخدم على إتاحة كامل تفاصيل التقرير (بما فيها الصور والفريمات) لمسؤولي الموقع.
-- **الأدمن:** لا يرى إلا التقارير المبلغ عنها أو المقيمة، حفاظاً على خصوصية المستخدمين.
-
----
-
-## 10. آلية توليد وتحميل تقارير PDF
-
-- **ReportController@generate:** يجلب التحليل وتفاصيله من قاعدة البيانات.
-- يحول الصور (الفريمات/الوجوه) إلى base64 لعرضها داخل التقرير.
-- يستخدم DomPDF لتحويل واجهة Blade (`reports.analysis`) إلى PDF.
-- يرسل الملف للمستخدم للتحميل باسم مميز (deepfake_report_{id}.pdf).
-- لا يمكن للزائر تحميل PDF، فقط المستخدم المسجل.
+- **Evaluation:** After analysis results appear, users can evaluate if results are correct or incorrect, helping improve AI accuracy
+- **Reporting:** If report contains dangerous or sensitive content, users can report it, reaching administrators who can transfer to relevant authorities
+- **Privacy Notice:** During evaluation or reporting, users consent to full report details (including images, frames) being available to site administrators
+- **Administrator Access:** Admins only see evaluated or reported content, maintaining user privacy
 
 ---
 
-## 11. العلاقات بين الملفات والمكونات
+## 10. PDF Report Generation - توليد تقارير PDF
 
-- **Controllers ↔ Services:** الكنترولاتر تستدعي الخدمات لإرسال الملفات وتحليلها.
-- **Services ↔ FastAPI:** الخدمات ترسل الملفات عبر HTTP وتستقبل النتائج.
-- **Models ↔ Database:** النماذج تمثل جداول قاعدة البيانات (تحليل، تفاصيل، مستخدم).
-- **Views ↔ Controllers:** الواجهات تعرض البيانات القادمة من الكنترولاتر.
-- **Components:** مكونات جزئية لإعادة استخدام واجهات عرض التفاصيل، الإجراءات، النوافذ المنبثقة.
-
----
-
-## 12. أمثلة عملية (سيناريوهات)
-
-### سيناريو 1: تحليل صورة
-1. المستخدم يرفع صورة.
-2. النظام يكتشف الوجوه ويصنفها.
-3. تعرض النتيجة مع صور الوجوه.
-4. يمكن للمستخدم تقييم النتيجة أو الإبلاغ.
-5. يمكنه تحميل تقرير PDF إذا كان مسجلاً.
-
-### سيناريو 2: تحليل فيديو
-1. المستخدم يرفع فيديو.
-2. النظام يختار عدة فريمات، يحلل كل فريم كصورة.
-3. تعرض النتائج لكل فريم مع صور الوجوه.
-4. يمكن تحميل تقرير PDF مفصل.
-
-### سيناريو 3: تحليل صوت
-1. المستخدم يرفع ملف صوتي.
-2. النظام يقطع الصوت لمقاطع، يحلل كل مقطع.
-3. تعرض النتائج لكل مقطع مع صورة MFCC.
-
-### سيناريو 4: الأدمن يدير النظام
-1. الأدمن يدخل لوحة الإدارة.
-2. يرى فقط التقارير التي تم تقييمها أو الإبلاغ عنها.
-3. يمكنه تحويل التقارير المبلغ عنها لجهة مختصة.
-4. يطلع على تقييمات وبلاغات المستخدمين.
+- **ReportController@generate:** Retrieves analysis and details from database
+- Converts images (frames/faces) to base64 for PDF display
+- Uses DomPDF to convert Blade template (`reports.analysis`) to PDF
+- Sends file to user for download with unique name (deepfake_report_{id}.pdf)
+- PDF download only available to registered users
 
 ---
 
-## 13. ملحق: مخططات تدفق البيانات
+## 11. File Relationships - العلاقات بين الملفات
 
-### مخطط تدفق البيانات (مبسط)
-
-```mermaid
-graph TD
-A[المستخدم] -->|يرفع ملف| B[Laravel: DeepfakeController]
-B -->|يرسل الملف| C[DeepfakeDetectionService]
-C -->|HTTP POST| D[FastAPI /analyze]
-D -->|نتيجة JSON| C
-C -->|يحفظ النتيجة| E[Database: Analysis, AnalysisDetail]
-E -->|يعرض| F[واجهة المستخدم: dashboard/show]
-F -->|إجراءات| G[توليد PDF, تقييم, إبلاغ]
-```
+- **Controllers ↔ Services:** Controllers call services to send files and analyze them
+- **Services ↔ FastAPI:** Services send files via HTTP and receive results
+- **Models ↔ Database:** Models represent database tables (analysis, details, user)
+- **Views ↔ Controllers:** Views display data from controllers
+- **Components:** Reusable components for displaying details, actions, modals
 
 ---
 
-## 14. ملاحظات إضافية
-- **الخصوصية أولاً:** لا يمكن لأي مسؤول أو أدمن الوصول لتحليل أو تقرير إلا إذا تم تقييمه أو الإبلاغ عنه من قبل المستخدم.
-- **التقارير المبلغ عنها:** يمكن للأدمن تحويلها لجهة مختصة مع كامل التفاصيل.
-- **النظام يدعم التقييمات والبلاغات لتحسين الذكاء الاصطناعي باستمرار.**
-- **كل تحليل يحفظ تفاصيل دقيقة (فريمات، وجوه، مقاطع صوت، صور MFCC).**
-- **واجهة المستخدم مصممة لتكون سهلة الاستخدام وسريعة الاستجابة (Responsive).**
-- **النظام قابل للتطوير لإضافة أنواع ملفات أو نماذج ذكاء اصطناعي جديدة مستقبلاً.**
-- **جميع البيانات الحساسة (صور، فريمات، أصوات) لا تُعرض إلا لصاحبها أو للأدمن في حال التقييم أو الإبلاغ فقط.**
-- **النظام يلتزم بأفضل ممارسات الأمان وحماية البيانات.**
+## 12. Use Cases - حالات الاستخدام
+
+### Case 1: Image Analysis
+1. User uploads image
+2. System detects and classifies faces
+3. Displays results with face images
+4. User can evaluate result or report
+5. Can download PDF report if registered
+
+### Case 2: Video Analysis
+1. User uploads video
+2. System selects multiple frames, analyzes each as image
+3. Displays results for each frame with face images
+4. Can download detailed PDF report
+
+### Case 3: Audio Analysis
+1. User uploads audio file
+2. System segments audio, analyzes each segment
+3. Displays results for each segment with MFCC image
+
+### Case 4: Administrator Management
+1. Admin accesses management panel
+2. Sees only evaluated or reported content
+3. Can transfer reported content to relevant authorities
+4. Reviews user evaluations and reports
 
 ---
 
-**هذا الدليل يغطي جميع الجوانب التقنية والوظيفية للمشروع، ويُعد مرجعاً شاملاً لأي مطور أو مسؤول أو مستخدم متقدم.**
+## 13. Error Handling - معالجة الأخطاء
+
+| Error Case | Description/Cause |
+|------------|-------------------|
+| File open failure | File corrupted, unreadable, or not found |
+| No faces detected | No faces detected in image/video (MTCNN found no faces) |
+| Unsupported format | Uploaded file in unsupported format (e.g., PDF or unsupported audio format) |
+| FastAPI connection failure | Unable to access AI service (server unavailable or timeout) |
+| UNKNOWN cases and reasons | - No valid faces/frames/segments<br>- All results with low confidence<br>- Internal error during analysis<br>- File too short or invalid for analysis |
+| Preprocessing error | Failure in converting image/audio/video to required model format |
+| File size exceeded | File larger than allowed limit (e.g., > 100MB) |
+| Upload error | Connection interruption during upload or storage failure |
+
+**Note:** In all these cases, a clear error message is returned in JSON with failure reason, and `prediction` or `type` field is typically `UNKNOWN` with explanation in `details.reason`.
 
 ---
 
-## 8.1 منطق اتخاذ القرار (Decision Logic)
+## 14. API Reference - مرجع API
 
-### **أولاً: الصور (Image Decision Logic)**
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| /analyze | POST | Send image/video/audio for analysis | JSON: type, result, confidence, details |
+| /health | GET | Check FastAPI service health | JSON: status: ok/error |
+| /models | GET | Get information about supported models | JSON: list of models and supported file types |
 
-1. **اكتشاف الوجوه:**
-   - استخدام MTCNN لاكتشاف جميع الوجوه.
-   - إذا لم يتم اكتشاف أي وجه: النتيجة `UNKNOWN` (غير معروف)، الثقة = 0، مع سبب "No faces detected".
-2. **تصنيف كل وجه:**
-   - كل وجه يُقص ويُكبر إلى 224x224 ويمرر إلى EfficientNet-B4.
-   - النموذج يعطي تصنيف (REAL أو FAKE) مع قيمة ثقة.
-3. **تجميع النتائج:**
-   - حساب عدد الوجوه REAL وعدد الوجوه FAKE، وجمع الثقة لكل فئة.
-4. **اتخاذ القرار النهائي:**
-   - إذا لم يوجد أي وجه بثقة كافية (prob < 0.9): النتيجة `UNKNOWN`.
-   - إذا كان عدد REAL > FAKE: النتيجة `REAL`، الثقة = متوسط ثقة الوجوه REAL.
-   - إذا كان عدد FAKE > REAL: النتيجة `FAKE`، الثقة = متوسط ثقة الوجوه FAKE.
-   - إذا تساوى العدد: تقارن مجموع الثقة، الأعلى يحدد القرار.
-   - إذا لم يوجد أي وجه بثقة كافية: `UNKNOWN`.
-
-**الاحتمالات:**
-- لا يوجد وجوه: UNKNOWN.
-- كل الوجوه REAL: REAL.
-- كل الوجوه FAKE: FAKE.
-- خليط: الأغلبية أو الثقة الأعلى.
-- كل الوجوه بثقة منخفضة: UNKNOWN.
-
----
-
-### **ثانياً: الفيديو (Video Decision Logic)**
-
-1. **تقطيع الفيديو:**
-   - اختيار عدد محدد من الفريمات موزعة على طول الفيديو.
-2. **تحليل كل فريم:**
-   - كل فريم يعامل كصورة (نفس منطق الصور).
-3. **تجميع نتائج الفريمات:**
-   - لكل فريم، إذا لم يوجد وجوه: يتم تجاهله أو اعتباره UNKNOWN.
-   - لكل فريم مع وجوه: تصويت الأغلبية في الفريم.
-4. **اتخاذ القرار النهائي:**
-   - إذا كان عدد الفريمات REAL > FAKE: النتيجة REAL.
-   - إذا كان عدد الفريمات FAKE > REAL: النتيجة FAKE.
-   - إذا تساوى العدد: تقارن مجموع الثقة.
-   - إذا لم يتم تحليل أي فريم بنجاح: UNKNOWN.
-
-**الاحتمالات:**
-- كل الفريمات بدون وجوه: UNKNOWN.
-- أغلب الفريمات REAL: REAL.
-- أغلب الفريمات FAKE: FAKE.
-- تساوي: الثقة الأعلى.
-- كل الفريمات بثقة منخفضة: UNKNOWN.
-
----
-
-### **ثالثاً: الصوت (Audio Decision Logic)**
-
-1. **تقطيع الصوت:**
-   - تقطيع الملف الصوتي إلى مقاطع قصيرة (2.5 ثانية) باستخدام VAD.
-2. **تحليل كل مقطع:**
-   - استخراج ميزات MFCC وDelta وDelta-Delta.
-   - تمريرها إلى BiLSTM.
-   - إذا prob > 0.5: المقطع FAKE، الثقة = prob.
-   - إذا prob <= 0.5: المقطع REAL، الثقة = 1 - prob.
-3. **تجميع النتائج:**
-   - عدّ عدد المقاطع FAKE بثقة عالية (prob > 0.75).
-   - عدّ عدد المقاطع REAL.
-   - حساب متوسط الثقة لكل فئة.
-4. **قواعد القرار النهائية:**
-   - إذا كان هناك 3 مقاطع أو أكثر FAKE بثقة > 0.75: الملف FAKE.
-   - إذا كان هناك مقطع واحد على الأقل prob > threshold (مثلاً 0.6 أو 0.75): الملف FAKE (حسب الكود).
-   - إذا لم تتحقق القواعد أعلاه: الأغلبية (majority vote).
-   - إذا لم يكن هناك أي مقطع صالح للتحليل: UNKNOWN.
-
-**الاحتمالات:**
-- لا يوجد مقاطع صوتية صالحة: UNKNOWN.
-- 3 مقاطع أو أكثر FAKE بثقة > 0.75: FAKE.
-- مقطع واحد FAKE بثقة عالية جداً: FAKE (حسب الكود).
-- أغلب المقاطع FAKE: FAKE.
-- أغلب المقاطع REAL: REAL.
-- تساوي: متوسط الثقة أو UNKNOWN.
-
----
-
-**ملاحظات عامة:**
-- في جميع الحالات، إذا لم تتوفر بيانات كافية (لا وجوه، لا فريمات، لا مقاطع صوتية صالحة)، تكون النتيجة UNKNOWN.
-- يتم إرجاع تفاصيل دقيقة في JSON (عدد الوجوه/الفريمات/المقاطع، الثقة، المسارات، الأسباب).
-- كل قرار نهائي مدعوم بتفاصيل فرعية (لماذا تم اتخاذ القرار، كم عدد العناصر، كم الثقة، إلخ).
-
----
-
-## 15. الحالات الخاصة والأخطاء (Special Cases & Errors)
-
-| الحالة                       | الوصف/السبب                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
-| فشل فتح الملف                | الملف تالف، غير قابل للقراءة، أو غير موجود.                                 |
-| عدم اكتشاف وجوه              | لم يتم اكتشاف أي وجه في الصورة/الفيديو (MTCNN لم يجد وجوهًا).              |
-| صيغة غير مدعومة              | رفع ملف بصيغة غير مدعومة (مثلاً PDF أو صيغة صوتية غير مدعومة).             |
-| فشل الاتصال بـ FastAPI       | تعذر الوصول إلى خدمة الذكاء الاصطناعي (الخادم غير متاح أو timeout).         |
-| حالات UNKNOWN وأسبابها       | - لا يوجد وجوه/فريمات/مقاطع صالحة.<br>- كل النتائج بثقة منخفضة.<br>- خطأ داخلي أثناء التحليل.<br>- الملف قصير جدًا أو غير صالح للتحليل. |
-| خطأ في المعالجة المسبقة      | فشل في تحويل الصورة/الصوت/الفيديو إلى الشكل المطلوب للنموذج.              |
-| تجاوز حجم الملف              | الملف أكبر من الحد المسموح به (مثلاً > 100MB).                             |
-| خطأ في رفع الملف             | انقطاع الاتصال أثناء الرفع أو فشل في التخزين المؤقت.                        |
-
-**ملاحظة:** في جميع هذه الحالات، يتم إرجاع رسالة خطأ واضحة في JSON مع سبب الفشل، ويكون الحقل `prediction` أو `type` غالبًا `UNKNOWN` مع شرح في `details.reason`.
-
----
-
-## 16. واجهة API (ملحق للمطورين)
-
-| المسار         | الطريقة | الوصف                                 | الاستجابة (Response)                                  |
-|----------------|---------|---------------------------------------|-------------------------------------------------------|
-| /analyze       | POST    | إرسال صورة/فيديو/صوت للتحليل         | JSON: النوع، النتيجة، الثقة، التفاصيل                 |
-| /health        | GET     | فحص صحة خدمة FastAPI                  | JSON: status: ok/error                                |
-| /models        | GET     | جلب معلومات عن النماذج المدعومة      | JSON: قائمة النماذج وأنواع الملفات المدعومة           |
-
-### مثال على استجابة /analyze:
+### Example /analyze response:
 ```json
 {
-  "type": "image", // أو "video" أو "audio"
-  "prediction": "REAL", // أو "FAKE" أو "UNKNOWN"
+  "type": "image", // or "video" or "audio"
+  "prediction": "REAL", // or "FAKE" or "UNKNOWN"
   "confidence": 0.92,
   "details": {
     "faces_detected": 2,
     "face_details": [ ... ],
-    "reason": "No faces detected" // في حال UNKNOWN
+    "reason": "No faces detected" // in case of UNKNOWN
   }
 }
 ```
 
-**ملاحظات:**
-- جميع الاستجابات في صيغة JSON.
-- في حال الخطأ، يعاد حقل `status: error` مع رسالة توضيحية.
-- يجب إرسال الملفات كـ multipart/form-data.
-- يمكن توسيع الواجهة مستقبلاً لمسارات إضافية (إدارة المستخدمين، سجل التحليلات، إلخ). 
+**Notes:**
+- All responses in JSON format
+- In case of error, `status: error` field returned with explanatory message
+- Files must be sent as multipart/form-data
+- API can be extended for additional endpoints (user management, analysis history, etc.)
+
+---
+
+## Decision Logic - منطق اتخاذ القرار
+
+### **Image Decision Logic:**
+1. **Face Detection:** Use MTCNN to detect all faces
+2. **Face Classification:** Each face cropped, resized to 224x224, passed to EfficientNet-B4
+3. **Result Aggregation:** Count REAL and FAKE faces, sum confidence for each category
+4. **Final Decision:** Majority vote with confidence consideration
+
+### **Video Decision Logic:**
+1. **Frame Selection:** Select specific number of frames distributed across video
+2. **Frame Analysis:** Each frame treated as image (same logic as images)
+3. **Result Aggregation:** Majority voting across frames
+4. **Final Decision:** Frame majority determines final result
+
+### **Audio Decision Logic:**
+1. **Audio Segmentation:** Segment audio file into short segments (2.5 seconds) using VAD
+2. **Segment Analysis:** Extract MFCC features, classify using BiLSTM
+3. **Result Aggregation:** Count high-confidence fake segments
+4. **Final Decision:** If 3+ segments fake with confidence > 0.75, file is fake
+
+---
+
+**This documentation covers all technical and functional aspects of the project and serves as a comprehensive reference for developers, administrators, and advanced users.** 
