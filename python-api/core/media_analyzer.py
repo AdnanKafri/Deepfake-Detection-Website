@@ -4,14 +4,24 @@ from PIL import Image
 import cv2
 import numpy as np
 import os
+from pathlib import Path
 from facenet_pytorch import MTCNN
 from efficientnet_pytorch import EfficientNet
 import shutil
 import uuid
 from faker import Faker
-import tensorflow as tf
+try:
+    import tensorflow as tf  # noqa: F401
+except ImportError:
+    tf = None
 
 fake = Faker()
+
+PYTHON_API_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = PYTHON_API_DIR.parent
+MODELS_DIR = PYTHON_API_DIR / "models"
+LARAVEL_ANALYSIS_FRAMES_DIR = PROJECT_ROOT / "laravel-app" / "storage" / "app" / "public" / "analysis_frames"
+IMAGE_MODEL_PATH = MODELS_DIR / "fine_tuned_epoch_25.pt"
 
 class MediaAnalyzer:
     def __init__(self):
@@ -19,7 +29,7 @@ class MediaAnalyzer:
 
         self.model = EfficientNet.from_name('efficientnet-b4')
         self.model._fc = torch.nn.Linear(self.model._fc.in_features, 2)
-        self.model.load_state_dict(torch.load("models/fine_tuned_epoch_25.pt", map_location=self.device))
+        self.model.load_state_dict(torch.load(IMAGE_MODEL_PATH, map_location=self.device))
         self.model = self.model.to(self.device).eval()
 
         self.mtcnn = MTCNN(image_size=224, margin=40, keep_all=True, device=self.device, post_process=False, min_face_size=20).eval()
@@ -50,8 +60,8 @@ class MediaAnalyzer:
         analysis_id = f"{base_id}_{unique_suffix}"
         
         # إنشاء مجلد مشترك مع Laravel
-        shared_dir = "../laravel-app/storage/app/public/analysis_frames"
-        analysis_dir = os.path.join(shared_dir, analysis_id)
+        shared_dir = LARAVEL_ANALYSIS_FRAMES_DIR
+        analysis_dir = shared_dir / analysis_id
         original_dir = os.path.join(analysis_dir, "original")
         cropped_dir = os.path.join(analysis_dir, "cropped")
         
@@ -136,8 +146,8 @@ class MediaAnalyzer:
         # إنشاء مجلد في storage مشترك مع Laravel
         if save_frames:
             # استخدام مجلد مشترك مع Laravel
-            shared_dir = "../laravel-app/storage/app/public/analysis_frames"
-            analysis_dir = os.path.join(shared_dir, analysis_id)
+            shared_dir = LARAVEL_ANALYSIS_FRAMES_DIR
+            analysis_dir = shared_dir / analysis_id
             original_dir = os.path.join(analysis_dir, "original")
             cropped_dir = os.path.join(analysis_dir, "cropped")
             

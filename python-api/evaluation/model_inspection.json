@@ -1,0 +1,187 @@
+{
+  "project_root": "C:\\Users\\ASUS\\Desktop\\HACK IT\\مشاريع\\مشروع تخرج\\Graduation Project\\python-api",
+  "models_dir": "C:\\Users\\ASUS\\Desktop\\HACK IT\\مشاريع\\مشروع تخرج\\Graduation Project\\python-api\\models",
+  "image_model": {
+    "path": "C:\\Users\\ASUS\\Desktop\\HACK IT\\مشاريع\\مشروع تخرج\\Graduation Project\\python-api\\models\\fine_tuned_epoch_25.pt",
+    "exists": true,
+    "file_size_mb": 67.68,
+    "archive_file_count": 710,
+    "archive_head": [
+      "fine_tuned_epoch_25/data.pkl",
+      "fine_tuned_epoch_25/byteorder",
+      "fine_tuned_epoch_25/data/0",
+      "fine_tuned_epoch_25/data/1",
+      "fine_tuned_epoch_25/data/10",
+      "fine_tuned_epoch_25/data/100",
+      "fine_tuned_epoch_25/data/101",
+      "fine_tuned_epoch_25/data/102",
+      "fine_tuned_epoch_25/data/103",
+      "fine_tuned_epoch_25/data/104",
+      "fine_tuned_epoch_25/data/105",
+      "fine_tuned_epoch_25/data/106",
+      "fine_tuned_epoch_25/data/107",
+      "fine_tuned_epoch_25/data/108",
+      "fine_tuned_epoch_25/data/109",
+      "fine_tuned_epoch_25/data/11",
+      "fine_tuned_epoch_25/data/110",
+      "fine_tuned_epoch_25/data/111",
+      "fine_tuned_epoch_25/data/112",
+      "fine_tuned_epoch_25/data/113",
+      "fine_tuned_epoch_25/data/114",
+      "fine_tuned_epoch_25/data/115",
+      "fine_tuned_epoch_25/data/116",
+      "fine_tuned_epoch_25/data/117",
+      "fine_tuned_epoch_25/data/118"
+    ],
+    "torch_load_error": "No module named 'torch'"
+  },
+  "audio_model": {
+    "path": "C:\\Users\\ASUS\\Desktop\\HACK IT\\مشاريع\\مشروع تخرج\\Graduation Project\\python-api\\models\\best_lstm_model_v3.keras",
+    "exists": true,
+    "file_size_mb": 2.96,
+    "archive_files": [
+      "metadata.json",
+      "config.json",
+      "model.weights.h5"
+    ],
+    "metadata": {
+      "keras_version": "3.8.0",
+      "date_saved": "2025-06-08@12:28:40"
+    },
+    "keras_class": "Sequential",
+    "compile_config": {
+      "optimizer": {
+        "module": "keras.optimizers",
+        "class_name": "Adam",
+        "config": {
+          "name": "adam",
+          "learning_rate": 9.999999747378752e-05,
+          "weight_decay": null,
+          "clipnorm": null,
+          "global_clipnorm": null,
+          "clipvalue": null,
+          "use_ema": false,
+          "ema_momentum": 0.99,
+          "ema_overwrite_frequency": null,
+          "loss_scale_factor": null,
+          "gradient_accumulation_steps": null,
+          "beta_1": 0.9,
+          "beta_2": 0.999,
+          "epsilon": 1e-07,
+          "amsgrad": false
+        },
+        "registered_name": null
+      },
+      "loss": "binary_crossentropy",
+      "loss_weights": null,
+      "metrics": [
+        "accuracy",
+        {
+          "module": "keras.metrics",
+          "class_name": "AUC",
+          "config": {
+            "name": "auc",
+            "dtype": "float32",
+            "num_thresholds": 200,
+            "curve": "ROC",
+            "summation_method": "interpolation",
+            "multi_label": false,
+            "num_labels": null,
+            "label_weights": null,
+            "from_logits": false
+          },
+          "registered_name": null
+        },
+        {
+          "module": "keras.metrics",
+          "class_name": "Precision",
+          "config": {
+            "name": "precision",
+            "dtype": "float32",
+            "thresholds": null,
+            "top_k": null,
+            "class_id": null
+          },
+          "registered_name": null
+        },
+        {
+          "module": "keras.metrics",
+          "class_name": "Recall",
+          "config": {
+            "name": "recall",
+            "dtype": "float32",
+            "thresholds": null,
+            "top_k": null,
+            "class_id": null
+          },
+          "registered_name": null
+        }
+      ],
+      "weighted_metrics": null,
+      "run_eagerly": false,
+      "steps_per_execution": 1,
+      "jit_compile": false
+    },
+    "layers": [
+      {
+        "class_name": "InputLayer",
+        "name": "input_layer",
+        "units": null,
+        "activation": null,
+        "batch_shape": [
+          null,
+          130,
+          39
+        ],
+        "return_sequences": null
+      },
+      {
+        "class_name": "Bidirectional",
+        "name": "bidirectional",
+        "units": null,
+        "activation": null,
+        "batch_shape": null,
+        "return_sequences": null
+      },
+      {
+        "class_name": "Dropout",
+        "name": "dropout",
+        "units": null,
+        "activation": null,
+        "batch_shape": null,
+        "return_sequences": null
+      },
+      {
+        "class_name": "LSTM",
+        "name": "lstm_1",
+        "units": 64,
+        "activation": "tanh",
+        "batch_shape": null,
+        "return_sequences": false
+      },
+      {
+        "class_name": "Dropout",
+        "name": "dropout_1",
+        "units": null,
+        "activation": null,
+        "batch_shape": null,
+        "return_sequences": null
+      },
+      {
+        "class_name": "Dense",
+        "name": "dense",
+        "units": 1,
+        "activation": "sigmoid",
+        "batch_shape": null,
+        "return_sequences": null
+      }
+    ]
+  },
+  "cannot_be_inferred_from_weights_alone": [
+    "Training accuracy, validation accuracy, precision, recall, F1-score, or ROC-AUC",
+    "Which dataset or dataset split was used",
+    "Class balance, data leakage, or augmentation policy",
+    "Threshold calibration quality and real-world robustness",
+    "Whether the saved label mapping matches the current inference code"
+  ]
+}
