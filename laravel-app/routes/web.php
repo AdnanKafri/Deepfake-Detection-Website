@@ -16,6 +16,7 @@ use App\Http\Controllers\ReportController;
 # 🔹 الصفحة الرئيسية: تحليل تفاعلي
 Route::get('/', [DeepfakeController::class, 'index'])->name('deepfake.index');
 Route::post('/deepfake/analyze', [DeepfakeController::class, 'analyze'])->name('deepfake.analyze');
+Route::get('/deepfake/analyze/{analysis}/status', [DeepfakeController::class, 'status'])->name('deepfake.status');
 
 # 🔐 صفحات محمية للمستخدم
 Route::middleware('auth')->group(function () {

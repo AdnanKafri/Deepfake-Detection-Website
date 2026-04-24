@@ -124,6 +124,7 @@
 @push('scripts')
 <script>
     const DEEPFAKE_ANALYZE_URL = "{{ route('deepfake.analyze') }}";
+    const DEEPFAKE_STATUS_URL_TEMPLATE = "{{ route('deepfake.status', ['analysis' => '__ANALYSIS_ID__']) }}";
 
     // Scroll smoothly to upload section
     document.addEventListener('DOMContentLoaded', function() {

@@ -13,13 +13,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const downloadReport = document.getElementById('downloadReport');
     const showDetailsBtn = document.getElementById('showDetailsBtn');
 
-    // SweetAlert Functions
+    let activePollTimeout = null;
+
     function showError(message) {
         if (typeof Swal === 'undefined') {
             alert('خطأ: ' + message);
             return;
         }
-        
+
         Swal.fire({
             title: 'خطأ!',
             text: message,
@@ -34,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('تحذير: ' + message);
             return;
         }
-        
+
         Swal.fire({
             title: 'تحذير!',
             text: message,
@@ -44,22 +45,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function showInfo(message) {
-        if (typeof Swal === 'undefined') {
-            alert('معلومات: ' + message);
-            return;
-        }
-        
-        Swal.fire({
-            title: 'معلومات',
-            text: message,
-            icon: 'info',
-            confirmButtonText: 'حسناً',
-            confirmButtonColor: '#3B82F6'
-        });
-    }
-
-    // Handle drag and drop events
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
     });
@@ -77,80 +62,75 @@ document.addEventListener('DOMContentLoaded', function () {
         dropZone.addEventListener(eventName, () => dropZone.classList.remove('bg-blue-50'), false);
     });
 
-    // Handle file drop
     dropZone.addEventListener('drop', e => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
+        handleFiles(e.dataTransfer.files);
     });
 
-    // Handle file selection
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', function () {
         handleFiles(this.files);
     });
 
-    // Handle file preview
     function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            const validTypes = ['image/jpeg', 'image/png', 'video/mp4', 'video/avi', 'audio/mpeg', 'audio/wav'];
+        if (files.length <= 0) {
+            return;
+        }
 
-            if (!validTypes.includes(file.type)) {
-                showError('نوع الملف غير مدعوم. يرجى اختيار صورة أو فيديو أو ملف صوتي.');
+        const file = files[0];
+        const validTypes = ['image/jpeg', 'image/png', 'video/mp4', 'video/avi', 'audio/mpeg', 'audio/wav'];
+
+        if (!validTypes.includes(file.type)) {
+            showError('نوع الملف غير مدعوم. يرجى اختيار صورة أو فيديو أو ملف صوتي.');
+            return;
+        }
+
+        if (fileName) fileName.textContent = file.name;
+        if (fileSize) fileSize.textContent = formatFileSize(file.size);
+        if (previewContainer) previewContainer.classList.remove('hidden');
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'pointer-events-none');
+            submitBtn.style.display = '';
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            if (!mediaPreview) {
                 return;
             }
 
-            // Update file info
-            if (fileName) fileName.textContent = file.name;
-            if (fileSize) fileSize.textContent = formatFileSize(file.size);
-            if (previewContainer) previewContainer.classList.remove('hidden');
+            mediaPreview.innerHTML = '';
 
-            // إعادة إظهار زر التحليل عند رفع وسيط جديد
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-50', 'pointer-events-none');
-                submitBtn.style.display = '';
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'media-preview w-48 h-48 object-cover mx-auto rounded-lg';
+                mediaPreview.appendChild(img);
+            } else if (file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = e.target.result;
+                video.controls = true;
+                video.className = 'media-preview w-48 h-48 object-cover mx-auto rounded-lg';
+                mediaPreview.appendChild(video);
+            } else if (file.type.startsWith('audio/')) {
+                const audio = document.createElement('audio');
+                audio.src = e.target.result;
+                audio.controls = true;
+                audio.className = 'w-full';
+                mediaPreview.appendChild(audio);
             }
-
-            // Create preview
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                if (mediaPreview) {
-                mediaPreview.innerHTML = '';
-                if (file.type.startsWith('image/')) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'media-preview w-48 h-48 object-cover mx-auto rounded-lg';
-                    mediaPreview.appendChild(img);
-                } else if (file.type.startsWith('video/')) {
-                    const video = document.createElement('video');
-                    video.src = e.target.result;
-                    video.controls = true;
-                    video.className = 'media-preview w-48 h-48 object-cover mx-auto rounded-lg';
-                    mediaPreview.appendChild(video);
-                } else if (file.type.startsWith('audio/')) {
-                    const audio = document.createElement('audio');
-                    audio.src = e.target.result;
-                    audio.controls = true;
-                    audio.className = 'w-full';
-                    mediaPreview.appendChild(audio);
-                    }
-                } else {
-                    console.error('mediaPreview غير موجود في الصفحة!');
-                }
-            };
-            reader.readAsDataURL(file);
-        }
+        };
+        reader.readAsDataURL(file);
     }
 
-    // Remove file
     removeFile.addEventListener('click', function () {
         fileInput.value = '';
         if (previewContainer) previewContainer.classList.add('hidden');
         if (mediaPreview) mediaPreview.innerHTML = '';
-        // إعادة إظهار زر التحليل عند إزالة الملف
+        clearPoll();
+
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {
             submitBtn.disabled = false;
@@ -159,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Format file size
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -168,7 +147,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // Form submission
     form.addEventListener('submit', async function (e) {
         e.preventDefault();
 
@@ -178,7 +156,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // إخفاء زر التحليل أثناء التحميل
+        clearPoll();
+
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -188,16 +167,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('file_type', file.type.split('/')[0]);
 
-        // Add the file type to the form data
-        const fileType = file.type.split('/')[0];
-        formData.append('file_type', fileType);
-
-        // Show loader
         if (loading) loading.classList.remove('hidden');
-        else console.error('عنصر #loading غير موجود في الصفحة!');
         if (results) results.classList.add('hidden');
-        if (resultContent) resultContent.innerHTML = "";
+        if (resultContent) resultContent.innerHTML = '';
 
         try {
             const response = await fetch(DEEPFAKE_ANALYZE_URL, {
@@ -214,30 +188,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(data.message || 'فشل التحليل');
             }
 
-            const result = data.data?.data || data.data;
-            // تعيين معرف آخر تحليل من response مباشرة
             window.lastAnalysisId = data.analysis_id;
-            displayResults(result);
-
+            displayProcessingState(data.data || {}, data.processing_status || 'queued');
+            pollAnalysisStatus(data.analysis_id);
         } catch (error) {
             console.error('Error:', error);
-            // محاولة استخراج تفاصيل الخطأ من الاستجابة
-            let errorMsg = error.message || 'حدث خطأ غير متوقع.';
-            // إذا كانت الرسالة تشير لسبب معروف (عدم وجود وجه/صوت)
-            if (errorMsg.includes('No faces detected') || errorMsg.includes('No valid faces detected')) {
-                showError('لم يتم اكتشاف أي وجه في الصورة. يرجى رفع صورة تحتوي على وجه واضح.');
-            } else if (errorMsg.includes('No voice activity detected')) {
-                showError('لم يتم اكتشاف صوت واضح في الملف الصوتي. يرجى رفع مقطع صوتي واضح.');
-            } else if (errorMsg.includes('نوع الملف غير مدعوم') || errorMsg.includes('Unsupported file type')) {
-                showError('نوع الملف غير مدعوم. يرجى رفع صورة أو فيديو أو صوت بصيغة مدعومة.');
-            } else if (errorMsg.includes('UNKNOWN')) {
-                showError('لم يتمكن النظام من تحليل الملف. يرجى التأكد من وضوح المحتوى أو تجربة ملف آخر.');
-            } else {
-                showError('خطأ: ' + errorMsg);
-            }
+            showError('خطأ: ' + (error.message || 'حدث خطأ غير متوقع.'));
         } finally {
             if (loading) loading.classList.add('hidden');
-            // إعادة إظهار زر التحليل بعد انتهاء التحليل
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-50', 'pointer-events-none');
@@ -246,15 +204,101 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    function getStatusUrl(analysisId) {
+        return DEEPFAKE_STATUS_URL_TEMPLATE.replace('__ANALYSIS_ID__', analysisId);
+    }
+
+    function clearPoll() {
+        if (activePollTimeout) {
+            clearTimeout(activePollTimeout);
+            activePollTimeout = null;
+        }
+    }
+
+    async function pollAnalysisStatus(analysisId) {
+        try {
+            const response = await fetch(getStatusUrl(analysisId), {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Failed to fetch analysis status.');
+            }
+
+            const processingStatus = payload.processing_status;
+
+            if (processingStatus === 'completed' && payload.data) {
+                displayResults(payload.data);
+                return;
+            }
+
+            if (processingStatus === 'failed') {
+                showError(payload.error_message || 'فشل التحليل أثناء المعالجة الخلفية.');
+                displayFailedState(payload.error_message || 'فشل التحليل أثناء المعالجة الخلفية.');
+                return;
+            }
+
+            displayProcessingState(payload.data || {}, processingStatus);
+            activePollTimeout = setTimeout(() => pollAnalysisStatus(analysisId), 2500);
+        } catch (error) {
+            console.error('Polling error:', error);
+            activePollTimeout = setTimeout(() => pollAnalysisStatus(analysisId), 4000);
+        }
+    }
+
+    function displayProcessingState(data, processingStatus) {
+        if (results) results.classList.remove('hidden');
+
+        const type = data.type || (data.result && data.result.type) || 'unknown';
+        const statusLabel = processingStatus === 'processing' ? 'قيد المعالجة' : 'في قائمة الانتظار';
+        const html = `
+        <div class="result-card bg-gradient-to-br from-white via-blue-50 to-indigo-100 rounded-3xl shadow-2xl border-2 border-blue-200 p-8 mb-2 animate-fade-in-up" style="direction: rtl;">
+            <div class="flex flex-col items-center mb-6">
+                <div class="rounded-full bg-blue-100 shadow-lg flex items-center justify-center mb-4" style="width: 90px; height: 90px;">
+                    <i class="fa-solid fa-spinner fa-spin text-blue-500 text-5xl"></i>
+                </div>
+                <h3 class="text-3xl font-extrabold text-blue-700 mb-2">${statusLabel}</h3>
+                <p class="text-base text-gray-600 mb-2">تم استلام الملف وسيتم تحديث النتيجة تلقائياً عند اكتمال التحليل.</p>
+            </div>
+            <div class="text-center mt-2">
+                <span class="inline-block bg-blue-50 text-blue-700 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm">نوع الملف:
+                    <span class="font-bold">${type === 'image' ? 'صورة' : type === 'video' ? 'فيديو' : type === 'audio' ? 'صوت' : 'غير معروف'}</span>
+                </span>
+            </div>
+        </div>
+        `;
+
+        if (resultContent) resultContent.innerHTML = html;
+    }
+
+    function displayFailedState(message) {
+        if (results) results.classList.remove('hidden');
+
+        const html = `
+        <div class="result-card bg-gradient-to-br from-white via-red-50 to-red-100 rounded-3xl shadow-2xl border-2 border-red-200 p-8 mb-2 animate-fade-in-up" style="direction: rtl;">
+            <div class="flex flex-col items-center mb-6">
+                <div class="rounded-full bg-red-100 shadow-lg flex items-center justify-center mb-4" style="width: 90px; height: 90px;">
+                    <i class="fa-solid fa-triangle-exclamation text-red-500 text-5xl"></i>
+                </div>
+                <h3 class="text-3xl font-extrabold text-red-700 mb-2">فشل التحليل</h3>
+                <p class="text-base text-gray-600 mb-2">${message}</p>
+            </div>
+        </div>
+        `;
+
+        if (resultContent) resultContent.innerHTML = html;
+    }
+
     function displayResults(data) {
         if (results) results.classList.remove('hidden');
-        else console.error('عنصر #results غير موجود في الصفحة!');
 
-        // Robust extraction of type, prediction, confidence, and details
         const type = data.type || (data.result && data.result.type) || 'unknown';
         const prediction = data.prediction || (data.result && data.result.prediction) || 'UNKNOWN';
-        let confidence = data.confidence || (data.result && data.result.confidence);
-        if (typeof confidence !== 'number' || isNaN(confidence)) confidence = 0;
+        let confidence = data.confidence ?? (data.result && data.result.confidence);
+        if (typeof confidence !== 'number' || Number.isNaN(confidence)) confidence = 0;
         const confidencePercent = (confidence * 100).toFixed(2);
         const details = data.details || (data.result && data.result.details) || {};
 
@@ -276,7 +320,6 @@ document.addEventListener('DOMContentLoaded', function () {
             sublabel = 'لم يتمكن النظام من تحديد النتيجة.';
         }
 
-        // تفاصيل إضافية حسب النوع
         let extraGrid = '';
         if (type === 'image') {
             extraGrid = `
@@ -329,7 +372,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 ${extraGrid}
             </div>
             <div class="text-center mt-2">
-                <span class="inline-block bg-${color}-50 text-${color}-700 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm">نوع الملف: <span class="font-bold">${type === 'image' ? 'صورة' : type === 'video' ? 'فيديو' : type === 'audio' ? 'صوت' : 'غير معروف'}</span></span>
+                <span class="inline-block bg-${color}-50 text-${color}-700 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm">نوع الملف:
+                    <span class="font-bold">${type === 'image' ? 'صورة' : type === 'video' ? 'فيديو' : type === 'audio' ? 'صوت' : 'غير معروف'}</span>
+                </span>
             </div>
         </div>
         <style>
@@ -347,10 +392,8 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
 
         if (resultContent) resultContent.innerHTML = html;
-        else console.error('عنصر #resultContent غير موجود في الصفحة!');
     }
 
-    // إصلاح أزرار عرض التفاصيل/تحميل التقرير
     if (showDetailsBtn) {
         showDetailsBtn.addEventListener('click', function () {
             if (window.lastAnalysisId) {
@@ -360,6 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
     if (downloadReport) {
         downloadReport.addEventListener('click', function (e) {
             e.preventDefault();
@@ -371,17 +415,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Function to cleanup hanging modals
     function cleanupModals() {
-        // Remove any hanging modal containers
         const containers = document.querySelectorAll('.swal2-container');
         containers.forEach(container => {
             if (!container.classList.contains('swal2-shown')) {
                 container.remove();
             }
         });
-        
-        // Remove any hanging backdrops
+
         const backdrops = document.querySelectorAll('.swal2-backdrop');
         backdrops.forEach(backdrop => {
             if (!backdrop.classList.contains('swal2-backdrop-show')) {
@@ -390,54 +431,36 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Function to force close all modals
     function forceCloseAllModals() {
-        // Close any open SweetAlert
-        if (Swal.isVisible()) {
+        if (typeof Swal !== 'undefined' && Swal.isVisible()) {
             Swal.close();
         }
-        
-        // Remove all modal containers
-        const containers = document.querySelectorAll('.swal2-container');
-        containers.forEach(container => {
-            container.remove();
-        });
-        
-        // Remove all backdrops
-        const backdrops = document.querySelectorAll('.swal2-backdrop');
-        backdrops.forEach(backdrop => {
-            backdrop.remove();
-        });
-        
-        // Remove any modal-related styles from body
+
+        document.querySelectorAll('.swal2-container').forEach(container => container.remove());
+        document.querySelectorAll('.swal2-backdrop').forEach(backdrop => backdrop.remove());
+
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
     }
 
-    // Global event listener for modal cleanup
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('swal2-backdrop')) {
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('swal2-backdrop') && typeof Swal !== 'undefined') {
             Swal.close();
         }
     });
 
-    // Keyboard event listener for ESC key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            if (Swal.isVisible()) {
-                Swal.close();
-            }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && typeof Swal !== 'undefined' && Swal.isVisible()) {
+            Swal.close();
         }
     });
 
-    // Ensure modals are cleaned up on page unload
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function () {
+        clearPoll();
         forceCloseAllModals();
     });
 
-    // Clean up modals on page load
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         cleanupModals();
     });
 });
-

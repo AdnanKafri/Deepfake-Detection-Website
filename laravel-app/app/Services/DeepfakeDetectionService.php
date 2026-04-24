@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 
 class DeepfakeDetectionService
 {
-    protected $apiBaseUrl;
+    protected string $apiBaseUrl;
 
     public function __construct()
     {
@@ -23,7 +23,7 @@ class DeepfakeDetectionService
     {
         return $this->sendFileToApi($file, 'video', [
             'frames_to_sample' => $framesToSample,
-            'save_frames' => $saveFrames
+            'save_frames' => $saveFrames,
         ]);
     }
 
@@ -32,21 +32,44 @@ class DeepfakeDetectionService
         return $this->sendFileToApi($file, 'audio');
     }
 
+    public function analyzeStoredFile(string $absolutePath, string $originalName, string $fileType)
+    {
+        $extraParams = [];
+
+        if ($fileType === 'video') {
+            $extraParams = [
+                'frames_to_sample' => 10,
+                'save_frames' => true,
+            ];
+        }
+
+        return $this->sendPathToApi($absolutePath, $originalName, $fileType, $extraParams);
+    }
+
     protected function sendFileToApi(UploadedFile $file, string $fileType, array $extraParams = [])
+    {
+        return $this->sendPathToApi(
+            $file->getRealPath(),
+            $file->getClientOriginalName(),
+            $fileType,
+            $extraParams
+        );
+    }
+
+    protected function sendPathToApi(string $path, string $fileName, string $fileType, array $extraParams = [])
     {
         try {
             $params = array_merge([
-                'file_type' => $fileType
+                'file_type' => $fileType,
             ], $extraParams);
 
-            // timeout أطول للتحليل الصوتي المعقد
-            $timeout = ($fileType === 'audio') ? 300 : 120; // 5 دقائق للصوت، دقيقتان للباقي
+            $timeout = ($fileType === 'audio') ? 300 : 120;
 
             $response = Http::timeout($timeout)
                 ->attach(
                     'file',
-                    file_get_contents($file->getRealPath()),
-                    $file->getClientOriginalName()
+                    file_get_contents($path),
+                    $fileName
                 )
                 ->asMultipart()
                 ->post($this->apiBaseUrl . '/analyze', $params);

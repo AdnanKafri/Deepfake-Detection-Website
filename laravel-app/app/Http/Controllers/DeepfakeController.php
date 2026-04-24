@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Services\DeepfakeDetectionService;
-use Illuminate\Support\Facades\Log;
+use App\Jobs\ProcessMediaJob;
 use App\Models\Analysis;
-use App\Models\AnalysisDetail;
+use App\Services\DeepfakeDetectionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class DeepfakeController extends Controller
 {
-    protected $deepfakeService;
+    protected DeepfakeDetectionService $deepfakeService;
 
     public function __construct(DeepfakeDetectionService $deepfakeService)
     {
@@ -32,103 +32,104 @@ class DeepfakeController extends Controller
                 'file' => 'required|file|mimes:jpg,jpeg,png,mp4,avi,mov,mp3,wav|max:102400',
             ]);
 
-            // زيادة timeout للتحليل الصوتي
-            if ($request->file_type === 'audio') {
-                set_time_limit(300); // 5 دقائق للصوت
-            } else {
-                set_time_limit(120); // دقيقتان للباقي
-            }
-
             $file = $request->file('file');
-            $extension = strtolower($file->getClientOriginalExtension());
+            $fileType = $this->detectFileType($file->getClientOriginalExtension());
+            $storedName = Str::uuid()->toString() . '.' . strtolower($file->getClientOriginalExtension());
+            $filePath = $file->storeAs('uploads/deepfake', $storedName);
 
-            // تحديد نوع الملف
-            $fileType = in_array($extension, ['jpg', 'jpeg', 'png']) ? 'image' : (in_array($extension, ['mp4', 'avi', 'mov']) ? 'video' : 'audio');
-
-            // التحليل عبر الخدمة
-            if ($fileType === 'image') {
-                $result = $this->deepfakeService->analyzeImage($file);
-            } elseif ($fileType === 'video') {
-                // تحليل سريع للفيديو مع حفظ الصور للتقارير فقط
-                $result = $this->deepfakeService->analyzeVideo($file, 10, true);
-            } else {
-                $result = $this->deepfakeService->analyzeAudio($file);
-            }
-
-            // تأكد أن الرد يحوي النتيجة المطلوبة
-            $main = $result['result'] ?? $result;
-
-            // إذا كان المستخدم غير مسجل دخول، أرجع النتيجة فقط بدون حفظ
-            if (!Auth::check()) {
-                return response()->json([
-                    'status' => 'success',
-                    'data' => $result
-                ]);
-            }
-
-            // حفظ في قاعدة البيانات فقط للمستخدم المسجل
             $analysis = Analysis::create([
                 'user_id' => Auth::id(),
                 'file_name' => $file->getClientOriginalName(),
-                'file_type' => $main['type'] ?? $fileType,
-                'prediction' => $main['prediction'] ?? 'UNKNOWN',
-                'confidence' => $main['confidence'] ?? 0,
-                'result_json' => json_encode($result),
+                'file_path' => $filePath,
+                'file_type' => $fileType,
+                'status' => Analysis::STATUS_QUEUED,
+                'prediction' => null,
+                'confidence' => null,
+                'result_json' => null,
+                'queued_at' => Carbon::now(),
             ]);
 
-            // حفظ التفاصيل (إن وجدت)
-            $details = $main['details'] ?? [];
-            if ($fileType === 'video' && isset($details['frame_images'])) {
-                foreach ($details['frame_images'] as $i => $frame) {
-                    $originalPath = $frame['original_path'] ?? null;
-                    $croppedPath = $frame['cropped_face_path'] ?? null;
-
-                    $analysis->details()->create([
-                        'segment_index' => $i,
-                        'prediction' => $frame['prediction'] ?? 'UNKNOWN',
-                        'confidence' => $frame['confidence'] ?? 0,
-                        'original_image_path' => $originalPath,
-                        'cropped_face_path' => $croppedPath,
-                        'extra_json' => json_encode($frame),
-                    ]);
-                }
-            } elseif ($fileType === 'image' && isset($details['face_details'])) {
-                // حفظ تفاصيل الوجوه للصور
-                foreach ($details['face_details'] as $i => $face) {
-                    $originalPath = $face['original_path'] ?? null;
-                    $croppedPath = $face['cropped_face_path'] ?? null;
-
-                    $analysis->details()->create([
-                        'segment_index' => $i,
-                        'prediction' => $face['prediction'] ?? 'UNKNOWN',
-                        'confidence' => $face['confidence'] ?? 0,
-                        'original_image_path' => $originalPath,
-                        'cropped_face_path' => $croppedPath,
-                        'extra_json' => json_encode($face),
-                    ]);
-                }
-            } elseif ($fileType === 'audio' && isset($details['segments'])) {
-                foreach ($details['segments'] as $i => $segment) {
-                    $analysis->details()->create([
-                        'segment_index' => $i,
-                        'prediction' => $segment['prediction'] ?? 'UNKNOWN',
-                        'confidence' => $segment['confidence'] ?? 0,
-                        'extra_json' => json_encode($segment),
-                    ]);
-                }
-            }
+            ProcessMediaJob::dispatch($analysis->id);
 
             return response()->json([
                 'status' => 'success',
-                'data' => $result,
-                'analysis_id' => $analysis->id
+                'analysis_id' => $analysis->id,
+                'processing_status' => $analysis->status,
+                'message' => 'Analysis is being processed.',
+                'data' => [
+                    'type' => $fileType,
+                    'prediction' => 'UNKNOWN',
+                    'confidence' => 0,
+                    'details' => [
+                        'status' => $analysis->status,
+                        'message' => 'Analysis is being processed in the background.',
+                    ],
+                ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Deepfake analysis error: ' . $e->getMessage());
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to analyze file: ' . $e->getMessage()
+                'message' => 'Failed to analyze file: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function status(Analysis $analysis)
+    {
+        if ($analysis->user_id !== null && (!Auth::check() || Auth::id() !== $analysis->user_id)) {
+            abort(403);
+        }
+
+        $resultData = $analysis->result_json ? json_decode($analysis->result_json, true) : null;
+        $mainResult = $resultData['result'] ?? $resultData;
+
+        return response()->json([
+            'status' => 'success',
+            'analysis_id' => $analysis->id,
+            'processing_status' => $analysis->status,
+            'data' => $mainResult,
+            'error_message' => $analysis->error_message,
+        ]);
+    }
+
+    protected function detectFileType(string $extension): string
+    {
+        $extension = strtolower($extension);
+
+        if (in_array($extension, ['jpg', 'jpeg', 'png'])) {
+            return 'image';
+        }
+
+        if (in_array($extension, ['mp4', 'avi', 'mov'])) {
+            return 'video';
+        }
+
+        return 'audio';
+    }
+
+    /**
+     * Legacy synchronous flow kept in place for the next migration phase.
+     */
+    protected function analyzeSynchronously(Request $request)
+    {
+        $file = $request->file('file');
+
+        if (!$file) {
+            throw new \InvalidArgumentException('Missing upload file.');
+        }
+
+        $fileType = $this->detectFileType($file->getClientOriginalExtension());
+
+        if ($fileType === 'image') {
+            return $this->deepfakeService->analyzeImage($file);
+        }
+
+        if ($fileType === 'video') {
+            return $this->deepfakeService->analyzeVideo($file, 10, true);
+        }
+
+        return $this->deepfakeService->analyzeAudio($file);
     }
 }
